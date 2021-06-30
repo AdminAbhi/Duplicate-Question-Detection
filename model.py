@@ -1,14 +1,11 @@
 import numpy as np
 import pandas as pd
 import nltk
-import pickle
 import random as rnd
 
 #!pip install trax
-#nltk.download('punkt')
-import trax
+nltk.download('punkt')
 from trax import layers as tl
-from trax.supervised import training
 from trax.fastmath import numpy as fastnp
 
 

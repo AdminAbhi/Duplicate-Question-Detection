@@ -1,7 +1,5 @@
 import numpy as np
 from flask import Flask, request, jsonify, render_template
-import pickle
-from model import *
 
 
 #question1 = "Do they enjoy eating the dessert?"
@@ -11,6 +9,8 @@ from model import *
 
 
 app = Flask(__name__)
+
+from model import *
 
 @app.route('/')
 def home():
@@ -23,14 +23,7 @@ def predict():
     output = prediction[0]
     return render_template('index.html', prediction_text='Result : {}'.format(output))
 
-@app.route('/results',methods=['POST'])
-def results():
 
-    data = request.get_json(force=True)
-    prediction = model.predict([np.array(list(data.values()))])
-
-    output = prediction[0]
-    return jsonify(output)
 
 if __name__ == "__main__":
     app.run(debug=True)
