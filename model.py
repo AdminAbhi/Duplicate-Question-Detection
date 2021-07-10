@@ -2,78 +2,26 @@ import numpy as np
 import pandas as pd
 import nltk
 import random as rnd
+import pickle
 
 #!pip install trax
 nltk.download('punkt')
 from trax import layers as tl
 from trax.fastmath import numpy as fastnp
 
-
-data = pd.read_csv("questions.csv")
-N=len(data)
-N_train = 300000
-N_test  = 10*1024
-data_train = data[:N_train]
-data_test  = data[N_train:N_train+N_test]
-print("Train set:", len(data_train), "Test set:", len(data_test))
-del(data) # remove to free memory
-
-td_index = (data_train['is_duplicate'] == 1).to_numpy()
-td_index = [i for i, x in enumerate(td_index) if x] 
-
-Q1_train_words = np.array(data_train['question1'][td_index])
-Q2_train_words = np.array(data_train['question2'][td_index])
-
-Q1_test_words = np.array(data_test['question1'])
-Q2_test_words = np.array(data_test['question2'])
-
-
-
-#create arrays
-Q1_train = np.empty_like(Q1_train_words)
-Q2_train = np.empty_like(Q2_train_words)
-
-
 from collections import defaultdict
 
+voc = pickle.load(open('vocab.pkl', 'rb'))
+
 vocab = defaultdict(lambda: 0)
-vocab['<PAD>'] = 1
 
-for idx in range(len(Q1_train_words)):
-    Q1_train[idx] = nltk.word_tokenize(Q1_train_words[idx])
-    Q2_train[idx] = nltk.word_tokenize(Q2_train_words[idx])
-    q = Q1_train[idx] + Q2_train[idx]
-    for word in q:
-        if word not in vocab:
-            vocab[word] = len(vocab) + 1
-
-del(td_index)
-del(Q1_train_words)
-del(Q2_train_words)
-del(Q1_train)
-del(Q2_train)
-del(data_train)
-del(data_test)
-
+for i in voc:
+  vocab[i] = voc[i]
 
 print('The length of the vocabulary is: ', len(vocab))
 
 
 def data_generator(Q1, Q2, batch_size, pad=1, shuffle=True):
-    """Generator function that yields batches of data
-
-    Args:
-        Q1 (list): List of transformed (to tensor) questions.
-        Q2 (list): List of transformed (to tensor) questions.
-        batch_size (int): Number of elements per batch.
-        pad (int, optional): Pad character from the vocab. Defaults to 1.
-        shuffle (bool, optional): If the batches should be randomnized or not. Defaults to True.
-    Yields:
-        tuple: Of the form (input1, input2) with types (numpy.ndarray, numpy.ndarray)
-        NOTE: input1: inputs to your model [q1a, q2a, q3a, ...] i.e. (q1a,q1b) are duplicates
-              input2: targets to your model [q1b, q2b,q3b, ...] i.e. (q1a,q2i) i!=a are not duplicates
-    """
-
     input1 = []
     input2 = []
     idx = 0
@@ -129,16 +77,6 @@ def data_generator(Q1, Q2, batch_size, pad=1, shuffle=True):
 
 
 def Siamese(vocab_size=len(vocab), d_model=128, mode='train'):
-    """Returns a Siamese model.
-
-    Args:
-        vocab_size (int, optional): Length of the vocabulary. Defaults to len(vocab).
-        d_model (int, optional): Depth of the model. Defaults to 128.
-        mode (str, optional): 'train', 'eval' or 'predict', predict mode is for fast inference. Defaults to 'train'.
-
-    Returns:
-        trax.layers.combinators.Parallel: A Siamese model. 
-    """
 
     def normalize(x):  # normalizes the vectors to have L2 norm 1
         return x / fastnp.sqrt(fastnp.sum(x * x, axis=-1, keepdims=True))
@@ -159,16 +97,6 @@ def Siamese(vocab_size=len(vocab), d_model=128, mode='train'):
 
 
 def TripletLossFn(v1, v2, margin=0.25):
-    """Custom Loss function.
-
-    Args:
-        v1 (numpy.ndarray): Array with dimension (batch_size, model_dimension) associated to Q1.
-        v2 (numpy.ndarray): Array with dimension (batch_size, model_dimension) associated to Q2.
-        margin (float, optional): Desired margin. Defaults to 0.25.
-
-    Returns:
-        jax.interpreters.xla.DeviceArray: Triplet Loss.
-    """
     ### START CODE HERE (Replace instances of 'None' with your code) ###
     
     # use fastnp to take the dot product of the two batches (don't forget to transpose the second argument)
@@ -201,20 +129,7 @@ def TripletLossFn(v1, v2, margin=0.25):
 
 
 def get_predict(question1, question2, threshold, model, vocab, data_generator=data_generator, verbose=False):
-    """Function for predicting if two questions are duplicates.
 
-    Args:
-        question1 (str): First question.
-        question2 (str): Second question.
-        threshold (float): Desired threshold.
-        model (trax.layers.combinators.Parallel): The Siamese model.
-        vocab (collections.defaultdict): The vocabulary used.
-        data_generator (function): Data generator function. Defaults to data_generator.
-        verbose (bool, optional): If the results should be printed out. Defaults to False.
-
-    Returns:
-        bool: True if the questions are duplicates, False otherwise.
-    """
     ### START CODE HERE (Replace instances of 'None' with your code) ###
     # use `nltk` word tokenize function to tokenize
     q1 = nltk.word_tokenize(question1)  # tokenize
@@ -222,10 +137,10 @@ def get_predict(question1, question2, threshold, model, vocab, data_generator=da
     Q1, Q2 = [], []
     for word in q1:  # encode q1
         # increment by checking the 'word' index in `vocab`
-        Q1 += [vocab[word]]
+        Q1 += [vocab[word.lower()]]
     for word in q2:  # encode q2
         # increment by checking the 'word' index in `vocab`
-        Q2 += [vocab[word]]
+        Q2 += [vocab[word.lower()]]
         
     # Call the data generator (built in Ex 01) using next()
     # pass [Q1] & [Q2] as Q1 & Q2 arguments of the data generator. Set batch size as 1
